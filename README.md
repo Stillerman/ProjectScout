@@ -1,14 +1,12 @@
-## ProjectScout
+# ProjectScout
 
-ProjectScout is a library designed to prepare a codebase for ingestion with an LLM. It provides tools to analyze directory contents, offering insights into file structures, token counts, and more
+ProjectScout is a library designed to prepare a codebase for ingestion with an LLM. It provides tools to analyze directory contents, offering insights into file structures, token counts, and more.
 
 ## Features
 
-- **Print Tokens:** Display the directory structure along with token counts for each file.
-- **Print Structure:** Print the directory structure without file contents.
-- **Print All:** Print the folder structure along with the contents of each file.
-- **Search Project:** Search for a specific pattern within the entire project.
-- **Modify File:** Modify the contents of a specified file.
+- **Overview:** Print the directory structure with optional token counts and file contents.
+- **Search:** Search for a specific pattern within the entire project.
+- **Modify:** Modify the contents of a specified file.
 
 ## Installation
 
@@ -33,56 +31,38 @@ ProjectScout is a library designed to prepare a codebase for ingestion with an L
 
 ### Basic Commands
 
-1. **Print Tokens:**
+1. **Overview:**
     ```sh
-    python cli.py print-tokens [DIRECTORY] [OPTIONS]
+    python cli.py overview [DIRECTORY] [OPTIONS]
     ```
     Options:
+    - `--tokens` : Include token counts for each file.
+    - `--content` : Include contents of each file.
     - `--large, -l [N]` : Show the top N largest files with the most tokens.
     
     Example:
     ```sh
-    python cli.py print-tokens ./my_project --large 5
+    python cli.py overview ./my_project --tokens --content --large 5
     ```
 
-2. **Print Structure:**
+2. **Search:**
     ```sh
-    python cli.py print-structure [DIRECTORY]
-    ```
-
-    Example:
-    ```sh
-    python cli.py print-structure ./my_project
-    ```
-
-3. **Print All:**
-    ```sh
-    python cli.py print-all [DIRECTORY]
+    python cli.py search [DIRECTORY] [PATTERN]
     ```
 
     Example:
     ```sh
-    python cli.py print-all ./my_project
+    python cli.py search ./my_project "TODO"
     ```
 
-4. **Search Project:**
+3. **Modify:**
     ```sh
-    python cli.py search-project [DIRECTORY] [PATTERN]
-    ```
-
-    Example:
-    ```sh
-    python cli.py search-project ./my_project "TODO"
-    ```
-
-5. **Modify File:**
-    ```sh
-    python cli.py modify-file [FILE_PATH] [CONTENT]
+    python cli.py modify [FILE_PATH] [CONTENT]
     ```
 
     Example:
     ```sh
-    python cli.py modify-file ./my_project/file.txt "New content for the file."
+    python cli.py modify ./my_project/file.txt "New content for the file."
     ```
 
 ## Detailed Description
