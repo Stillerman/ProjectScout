@@ -2,6 +2,7 @@ import os
 import click
 import tiktoken
 import pathspec
+import magic
 
 # Initialize the tokenizer for GPT-4
 enc = tiktoken.encoding_for_model("gpt-4")
@@ -19,6 +20,22 @@ def load_gitignore_patterns(directory):
         lines = f.readlines()
     
     return pathspec.PathSpec.from_lines('gitwildmatch', lines)
+
+def is_text_file(file_path):
+    mime = magic.Magic(mime=True)
+    mime_type = mime.from_file(file_path)
+    return mime_type.startswith('text')
+
+def is_large_file(file_path):
+    return os.path.getsize(file_path) > 1 * 1024 * 1024  # 1 MB
+
+def read_file(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read()
+    except UnicodeDecodeError:
+        with open(file_path, 'r', encoding='latin-1') as file:
+            return file.read()
 
 @click.group()
 def cli():
@@ -59,8 +76,8 @@ def print_tokens(directory):
         subindent = ' ' * 4 * (level + 1)
         for f in files:
             file_path = os.path.join(root, f)
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
+            if is_text_file(file_path) and not is_large_file(file_path):
+                content = read_file(file_path)
                 token_count = count_tokens(content)
                 folder_token_count += token_count
                 print(f"{subindent}{f} - {token_count} tokens")
@@ -84,9 +101,9 @@ def print_all(directory):
         subindent = ' ' * 4 * (level + 1)
         for f in files:
             file_path = os.path.join(root, f)
-            print(f"{subindent}{f}")
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
+            if is_text_file(file_path) and not is_large_file(file_path):
+                print(f"{subindent}{f}")
+                content = read_file(file_path)
                 print(f"{subindent}Contents:\n{subindent}{content}")
 
 @cli.command()
@@ -102,8 +119,8 @@ def search_project(directory, pattern):
 
         for f in files:
             file_path = os.path.join(root, f)
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
+            if is_text_file(file_path) and not is_large_file(file_path):
+                content = read_file(file_path)
                 if pattern in content:
                     print(f"Found in {file_path}")
 
