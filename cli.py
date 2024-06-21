@@ -3,6 +3,7 @@ import click
 import tiktoken
 import pathspec
 import magic
+from collections import defaultdict
 
 # Initialize the tokenizer for GPT-4
 enc = tiktoken.encoding_for_model("gpt-4")
@@ -41,6 +42,58 @@ def read_file(file_path):
 def cli():
     pass
 
+def print_directory_structure(directory, patterns, level=0, track_large=False, n=10):
+    total_tokens = 0
+    indent = ' ' * 4 * level
+    print(f"{indent}{os.path.basename(directory)}/")
+
+    subindent = ' ' * 4 * (level + 1)
+    large_files = []
+
+    for root, dirs, files in os.walk(directory):
+        # Filter out ignored files and directories
+        dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
+        files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
+        
+        for f in files:
+            file_path = os.path.join(root, f)
+            if is_text_file(file_path) and not is_large_file(file_path):
+                content = read_file(file_path)
+                token_count = count_tokens(content)
+                total_tokens += token_count
+                print(f"{subindent}{f} - {token_count} tokens")
+                if track_large:
+                    large_files.append((file_path, token_count))
+
+        for d in dirs:
+            subdir_path = os.path.join(root, d)
+            subdir_tokens, subdir_large_files = print_directory_structure(subdir_path, patterns, level + 1, track_large, n)
+            total_tokens += subdir_tokens
+            if track_large:
+                large_files.extend(subdir_large_files)
+
+        break  # Prevent os.walk from going into subdirectories again
+
+    print(f"{indent}Total tokens in folder: {total_tokens}")
+
+    if track_large:
+        large_files = sorted(large_files, key=lambda x: x[1], reverse=True)[:n]
+
+    return total_tokens, large_files
+
+@cli.command()
+@click.argument('directory', type=click.Path(exists=True))
+@click.option('--large', '-l', type=int, default=0, help="Show the top N largest files with the most tokens")
+def print_tokens(directory, large):
+    """Print the directory structure with token counts."""
+    patterns = load_gitignore_patterns(directory)
+    _, large_files = print_directory_structure(directory, patterns, track_large=(large > 0), n=large)
+    
+    if large > 0:
+        print("\nTop {} largest files with the most tokens:".format(large))
+        for file_path, token_count in large_files:
+            print(f"{file_path} - {token_count} tokens")
+
 @cli.command()
 @click.argument('directory', type=click.Path(exists=True))
 def print_structure(directory):
@@ -50,39 +103,13 @@ def print_structure(directory):
         # Filter out ignored files and directories
         dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
         files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
-        
+
         level = root.replace(directory, '').count(os.sep)
         indent = ' ' * 4 * (level)
         print(f"{indent}{os.path.basename(root)}/")
         subindent = ' ' * 4 * (level + 1)
         for f in files:
             print(f"{subindent}{f}")
-
-@cli.command()
-@click.argument('directory', type=click.Path(exists=True))
-def print_tokens(directory):
-    """Print the directory structure with token counts."""
-    patterns = load_gitignore_patterns(directory)
-    for root, dirs, files in os.walk(directory):
-        # Filter out ignored files and directories
-        dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
-        files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
-
-        level = root.replace(directory, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        folder_token_count = 0
-        print(f"{indent}{os.path.basename(root)}/")
-
-        subindent = ' ' * 4 * (level + 1)
-        for f in files:
-            file_path = os.path.join(root, f)
-            if is_text_file(file_path) and not is_large_file(file_path):
-                content = read_file(file_path)
-                token_count = count_tokens(content)
-                folder_token_count += token_count
-                print(f"{subindent}{f} - {token_count} tokens")
-
-        print(f"{indent}Total tokens in folder: {folder_token_count}")
 
 @cli.command()
 @click.argument('directory', type=click.Path(exists=True))
