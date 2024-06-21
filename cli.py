@@ -3,7 +3,6 @@ import click
 import tiktoken
 import pathspec
 import magic
-from collections import defaultdict
 
 # Initialize the tokenizer for GPT-4
 enc = tiktoken.encoding_for_model("gpt-4")
@@ -42,6 +41,11 @@ def read_file(file_path):
 def cli():
     pass
 
+def should_ignore(root, path, patterns):
+    """Helper function to determine if a path should be ignored based on .gitignore patterns."""
+    relative_path = os.path.relpath(os.path.join(root, path), start=root)
+    return patterns.match_file(relative_path)
+
 def print_directory_structure(directory, patterns, level=0, track_large=False, n=10):
     total_tokens = 0
     indent = ' ' * 4 * level
@@ -51,9 +55,9 @@ def print_directory_structure(directory, patterns, level=0, track_large=False, n
     large_files = []
 
     for root, dirs, files in os.walk(directory):
-        # Filter out ignored files and directories
-        dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
-        files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
+        # Filter out ignored directories
+        dirs[:] = [d for d in dirs if not should_ignore(root, d, patterns)]
+        files = [f for f in files if not should_ignore(root, f, patterns)]
         
         for f in files:
             file_path = os.path.join(root, f)
@@ -99,17 +103,27 @@ def print_tokens(directory, large):
 def print_structure(directory):
     """Print the directory structure."""
     patterns = load_gitignore_patterns(directory)
-    for root, dirs, files in os.walk(directory):
-        # Filter out ignored files and directories
-        dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
-        files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
+    print_filtered_structure(directory, patterns)
 
-        level = root.replace(directory, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        print(f"{indent}{os.path.basename(root)}/")
-        subindent = ' ' * 4 * (level + 1)
+def print_filtered_structure(directory, patterns, level=0):
+    indent = ' ' * 4 * level
+    print(f"{indent}{os.path.basename(directory)}/")
+    
+    subindent = ' ' * 4 * (level + 1)
+    for root, dirs, files in os.walk(directory):
+        # Filter out ignored directories and files
+        dirs[:] = [d for d in dirs if not should_ignore(root, d, patterns)]
+        files = [f for f in files if not should_ignore(root, f, patterns)]
+
         for f in files:
-            print(f"{subindent}{f}")
+            file_path = os.path.join(root, f)
+            if is_text_file(file_path) and not is_large_file(file_path):
+                print(f"{subindent}{f}")
+
+        for d in dirs:
+            print_filtered_structure(os.path.join(root, d), patterns, level + 1)
+        
+        break  # Prevent os.walk from going into subdirectories again
 
 @cli.command()
 @click.argument('directory', type=click.Path(exists=True))
@@ -117,9 +131,9 @@ def print_all(directory):
     """Print the folder structure and file contents."""
     patterns = load_gitignore_patterns(directory)
     for root, dirs, files in os.walk(directory):
-        # Filter out ignored files and directories
-        dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
-        files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
+        # Filter out ignored directories and files
+        dirs[:] = [d for d in dirs if not should_ignore(root, d, patterns)]
+        files = [f for f in files if not should_ignore(root, f, patterns)]
 
         level = root.replace(directory, '').count(os.sep)
         indent = ' ' * 4 * (level)
@@ -129,7 +143,7 @@ def print_all(directory):
         for f in files:
             file_path = os.path.join(root, f)
             if is_text_file(file_path) and not is_large_file(file_path):
-                print(f"{subindent}{f}")
+                print(f"{file_path}")
                 content = read_file(file_path)
                 print(f"{subindent}Contents:\n{subindent}{content}")
 
@@ -140,9 +154,9 @@ def search_project(directory, pattern):
     """Search for a pattern in the entire project."""
     patterns = load_gitignore_patterns(directory)
     for root, dirs, files in os.walk(directory):
-        # Filter out ignored files and directories
-        dirs[:] = [d for d in dirs if not patterns.match_file(os.path.join(root, d))]
-        files = [f for f in files if not patterns.match_file(os.path.join(root, f))]
+        # Filter out ignored directories and files
+        dirs[:] = [d for d in dirs if not should_ignore(root, d, patterns)]
+        files = [f for f in files if not should_ignore(root, f, patterns)]
 
         for f in files:
             file_path = os.path.join(root, f)
