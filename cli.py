@@ -22,6 +22,7 @@ def load_gitignore_patterns(directory):
     return pathspec.PathSpec.from_lines('gitwildmatch', lines)
 
 def is_text_file(file_path):
+    return True
     mime = magic.Magic(mime=True)
     mime_type = mime.from_file(file_path)
     return mime_type.startswith('text')
